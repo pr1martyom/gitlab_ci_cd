@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: {{ .Values.odoo.label }}
+  name: {{ .Values.odoo.name }}
+spec:
+  ports:
+  - name: http
+    port: {{ .Values.odoo.service.port }}
+    targetPort: {{ .Values.odoo.service.targetPort }}
+  selector:
+    app: {{ .Values.odoo.label }}

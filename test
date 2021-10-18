@@ -1,0 +1,95 @@
+stages:
+- build
+- publish
+- deploy
+- delete
+
+# Build and push the Docker image off of merges to master; based off
+# of Gitlab CI support in https://pythonspeed.com/products/pythoncontainer/
+
+
+deploy:
+  stage: deploy
+  image: centosadmin/kubernetes-helm:3.1.2
+  environment:
+    name: production
+  script:
+    - kubectl config set-cluster k8s --insecure-skip-tls-verify=true --server=$K8S_API_URL
+    - kubectl config set-credentials ci --token=$K8S_CI_TOKEN
+    - kubectl config set-context ci --cluster=k8s --user=ci
+    - kubectl config use-context ci
+    - helm upgrade --install $CI_PROJECT_PATH_SLUG .helm
+        --set image=$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME
+        --set imageTag=$CI_COMMIT_REF_SLUG.$CI_PIPELINE_ID
+        --wait
+        --timeout 300s
+        --atomic
+        --debug
+        --namespace $CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_NAME
+  only:
+    - master
+
+
+Kubectl deploy:
+  stage: deploy
+  tags:
+  - kubectl
+  - kubernetes
+  - local
+  image:
+    name: bitnami/kubectl:1.18.2
+    entrypoint: [""]
+  variables:
+    KUBECONFIG: /tmp/.kubeconfig
+    NAMESPACE: odoo$CI_PIPELINE_ID
+    ODOO_LABEL : odoo$CI_PIPELINE_ID
+    ODOO_NAME : odoo$CI_PIPELINE_ID
+    POSTGRE_NAME : postgre$CI_PIPELINE_ID
+    POSTGRE_LABEL : postgre$CI_PIPELINE_ID
+    DB_USER : odoo
+    DB_PASSWORD : odoo
+    ODOO_IMAGE : harbor.qzhub.net/odoo/odoo_image:56
+    #ODOO_IMAGE : $CI_HARBOR_ADDRESS_ODOO$CI_PROJECT_NAME":$CI_JOB_ID
+    SECRET : odooharbor 
+  script:
+  - echo "$K8S_CONFIG" | base64 -d > $KUBECONFIG
+  - sed -ri "s#<NAMESPACE>#${NAMESPACE}#g" manifests/odoo_configmap.yaml 
+  - cat manifests/odoo_configmap.yaml 
+  - sed -ri "s#<NAMESPACE>#${NAMESPACE}#g" manifests/ns.yaml
+  - cat manifests/ns.yaml
+  - sed -ri "s#<NAMESPACE>#${NAMESPACE}#g"; "s#<ODOO_LABEL>#${ODOO_LABEL}#g"; "s#<ODOO_NAME>#${ODOO_NAME}#g" manifests/odoo_ingress.yaml
+  - cat manifests/odoo_ingress.yaml
+  - sed -ri "s#<NAMESPACE>#${NAMESPACE}#g"; "s#<ODOO_NAME>#${ODOO_NAME}#g"; "s#<ODOO_LABEL>#${ODOO_LABEL}#g" manifests/odoo_service.yaml
+  - cat manifests/odoo_service
+  - sed -i "s#<NAMESPACE>#${NAMESPACE}#g"; "s#<ODOO_LABEL>#${ODOO_LABEL}#g"; "s#<ODOO_NAME>#${ODOO_NAME}#g" manifests/odoo_deployment.yaml 
+  - sed -i "s#<DB_USER>#${DB_USER}#g"; "s#<DB_PASSWORD>#${DB_PASSWORD}#g"; "s#<ODOO_IMAGE>#${ODOO_IMAGE}#g"; "s#<SECRET>#${SECRET}#g"; "s#<POSTGRE_NAME>#${POSTGRE_NAME}#g" manifests/odoo_deployment.yaml
+  - sed -i "s#<NAMESPACE>#${NAMESPACE}#g"; "s#<ODOO_NAME>#${ODOO_NAME}#g"; "s#<ODOO_LABEL>#${ODOO_LABEL}#g" manifests/odoo_pvc.yaml
+  - sed -i "s#<NAMESPACE>#${NAMESPACE}#g"; "s#<POSTGRE_NAME>#${POSTGRE_NAME}#g"; "s#<POSTGRE_LABEL>#${POSTGRE_LABEL}#g"; "s#<DB_USER>#${DB_USER}#g"; "s#<DB_PASSWORD>#${DB_PASSWORD}#g"  manifests/postgre_service.yaml
+  - sed -i "s#<NAMESPACE>#${NAMESPACE}#g"; "s#<POSTGRE_NAME>#${POSTGRE_NAME}#g"; "s#<POSTGRE_LABEL>#${POSTGRE_LABEL}#g" manifests/postgre_service.yaml
+
+  - kubectl create ns $NAMESPACE
+  - kubectl create secret docker-registry $SECRET -n $NAMESPACE --docker-server="$CI_REGISTRY" --docker-username="$CI_REGISTRY_USER" --docker-password="$CI_REGISTRY_PASSWORD"
+  - kubectl create -f manifests/odoo_configmap.yaml
+  - kubectl create -f manifests/odoo_pvc.yaml
+  - kubectl create -f manifests/odoo_deployment.yaml
+  - kubectl create -f manifests/odoo_service.yaml
+  - kubectl create -f manifests/odoo_ingress.yaml
+  - kubectl create -f manifests/postgre_service.yaml
+  - kubectl create -f manifests/postgre_deployment.yaml
+#  - kubectl create -f manifests/
+
+Kubectl delete:
+  tags:
+  - kubectl
+  - kubernetes
+  - local
+  image:
+    name: bitnami/kubectl:1.18.2
+    entrypoint: [""]
+  variables:
+    KUBECONFIG: /tmp/.kubeconfig
+  stage: delete
+  script:
+  - kubectl delete -f manifests/
+  when: manual
+  allow_failure: true # this line is redundant since manual job has this setting by default

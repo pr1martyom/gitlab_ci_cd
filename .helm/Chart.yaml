@@ -1,0 +1,7 @@
+apiVersion: v2
+name: odoo
+description: A Helm chart for odoo + postgres for ci
+home: https://github.com/ProspePrim
+source:
+type: application
+version: 1.0.0

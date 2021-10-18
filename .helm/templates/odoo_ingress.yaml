@@ -1,0 +1,20 @@
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: {{ .Values.odoo.ingress.proxyBodySize }}
+  labels:
+    app: {{ .Values.odoo.label }}
+  name: {{ .Values.odoo.name }}
+spec:
+  ingressClassName: nginx-controller
+  rules:
+  - host: {{ .Values.odoo.ingress.host }}
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: {{ .Values.odoo.name }}
+          servicePort: {{ .Values.odoo.ingress.port }}
+

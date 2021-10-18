@@ -1,0 +1,108 @@
+# Default values for odoo_gitlab_chart.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+odoo:
+ 
+  name: odoo
+ 
+  replicaCount: 1
+ 
+  label: odoo
+
+  strategy: 
+    type : Recreate
+  
+  imagePullSecrets: ""
+  
+  containers:
+    name: web
+
+  image: 
+    repository: odoo
+    tag: 13
+    pullPolicy: Always
+  
+  ports:
+    name: http
+    containerPort: 8069
+
+  livenessProbe:
+    httpGet:
+      path: /
+      port: http
+    initialDelaySeconds: 300
+    periodSeconds: 30
+    timeoutSeconds: 5
+    successThreshold: 1 
+    failureThreshold: 6
+  
+  readinessProbe:
+    httpGet:
+      path: /
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 6
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+  service:
+    port: 80
+    targetPort: 8069
+
+  pvc:
+    odooData:
+      name: odoo-data
+      storage: 1Gi
+    
+    odooAddons: 
+      name: odoo-addons
+      storage: 1Gi
+
+  ingress:
+    proxyBodySize: 1000m
+    host: testci.qzhub.net
+    port: 80
+
+postgres:
+  
+  name: postgres
+  
+  label: postgres
+  
+  replicas: 1
+
+  container:
+    name: postgres
+    image:
+      repository: postgres
+      tag: 10
+    
+    env:
+      pgdata: var/lib/postgresql/data/pgdata
+      postgresdb: postgres
+      postgrespass: odoo
+      pgpassword: odoo
+      postgresUser: odoo
+      pguser: odoo
+      
+    ports:
+      name: postgres
+      containerPort: 5432 
+
+  pvc:
+    name: postgre-data
+    storage: 1Gi
+    
+  service:
+    port: 5432
+    targetPort: 5432

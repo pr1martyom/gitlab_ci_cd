@@ -1,0 +1,78 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Values.odoo.label }}
+  name: {{ .Values.odoo.name }}
+spec:
+  replicas: {{ .Values.odoo.replicaCount  }}
+  strategy:
+    type: {{ .Values.odoo.strategy.type  }}
+  selector:
+    matchLabels:
+      app: {{ .Values.odoo.label }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.odoo.label }}
+    spec:
+      imagePullSecrets:
+      - name: {{ .Values.odoo.imagePullSecrets }}
+      containers:
+      - env:
+        - name: HOST
+          value: {{ .Values.postgres.name }}
+        - name: PASSWORD
+          value: {{ .Values.postgres.container.env.postgrespass }}
+        - name: USER
+          value: {{ .Values.postgres.container.env.postgresUser }}
+        image: {{ .Values.odoo.image.repository }}:{{ .Values.odoo.image.tag }}
+        imagePullPolicy: {{ .Values.odoo.image.pullPolicy }}
+        name: {{ .Values.odoo.containers.name  }}
+        ports:
+        - name: {{ .Values.odoo.ports.name  }}
+          containerPort: {{ .Values.odoo.ports.containerPort  }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: {{ .Values.odoo.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.odoo.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.odoo.livenessProbe.timeoutSeconds }} 
+          successThreshold: {{ .Values.odoo.livenessProbe.successThreshold }}
+          failureThreshold: {{ .Values.odoo.livenessProbe.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: {{ .Values.odoo.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.odoo.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.odoo.readinessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.odoo.readinessProbe.successThreshold }}
+          failureThreshold: {{ .Values.odoo.readinessProbe.failureThreshold }}
+        resources:
+{{ toYaml .Values.odoo.resources | indent 12 }}
+        volumeMounts:
+        - name: odoo-data
+          mountPath: /var/lib/odoo
+        - name: odoo-addons-persistent-storage
+          mountPath: /mnt/extra-addons
+        - name: odoo-conf
+          mountPath: /etc/odoo/odoo.conf
+          subPath: odoo.conf
+      hostname: {{ .Values.odoo.containers.name  }}
+      restartPolicy: Always
+      volumes:
+      - name: odoo-data
+        persistentVolumeClaim:
+          claimName: {{ .Values.odoo.pvc.odooData.name }}
+      - name: odoo-addons-persistent-storage
+        persistentVolumeClaim:
+          claimName: {{ .Values.odoo.pvc.odooAddons.name }}
+      - name: odoo-conf
+        configMap:
+          name: {{ .Values.odoo.name }}-configmap
+          items:
+            - key: odoo.conf
+              path: odoo.conf
